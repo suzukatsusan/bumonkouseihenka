@@ -4,185 +4,78 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>八王子食品 - チャネル戦略シミュレーター</title>
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- Babel Standalone -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script>
     tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#f0fdf4',
-              100: '#dcfce7',
-              200: '#bbf7d0',
-              300: '#86efac',
-              500: '#22c55e',
-              600: '#16a34a',
-              700: '#15803d',
-              800: '#166534',
-            },
-            accent: {
-              100: '#fef9c3',
-              200: '#fef08a',
-              400: '#facc15',
-              500: '#eab308',
-              600: '#ca8a04',
-            }
-          }
-        }
-      }
+      theme: { extend: { colors: { brand: { 500: '#22c55e' }, accent: { 400: '#facc15' } } } }
     }
   </script>
   <style>
     input[type=range]::-webkit-slider-thumb {
-      appearance: none;
-      height: 20px;
-      width: 20px;
-      border-radius: 50%;
-      background: #16a34a;
-      cursor: pointer;
-      box-shadow: 0 0 2px rgba(0,0,0,0.3);
+      appearance: none; height: 20px; width: 20px; border-radius: 50%;
+      background: #16a34a; cursor: pointer; box-shadow: 0 0 2px rgba(0,0,0,0.3);
     }
-    input[type=range]:focus {
-      outline: none;
-    }
-    /* 警告時のスライダー強調 */
-    .slider-warning::-webkit-slider-thumb {
-      background: #ef4444 !important;
-    }
+    input[type=range]:focus { outline: none; }
+    .slider-warning::-webkit-slider-thumb { background: #ef4444 !important; }
   </style>
 </head>
 <body class="bg-gradient-to-br from-emerald-50/50 via-slate-50 to-amber-50/30 text-slate-800 min-h-screen">
   <div id="root"></div>
-
   <script type="text/babel">
     const { useState, useMemo } = React;
 
-    // 初期基準データ (55億円ベース)
-    const BASE_TOTAL_SALES = 55.0; // 億円
-    const BASE_RATIOS = {
-      existing: 0.80, // 80%
-      commercial: 0.15, // 15%
-      coop: 0.05 // 5%
-    };
+    const BASE_TOTAL_SALES = 55.0; 
+    const BASE_RATIOS = { existing: 0.80, commercial: 0.15, coop: 0.05 };
 
-    // チャネルごとの変動費率定義 (新データ版)
     const COST_RATES = {
-      existing: {
-        name: "既存事業",
-        material: 0.35,
-        purchase: 0.08,
-        promo: 0.04,
-        logistics: 0.09,
-        centerFee: 0.085,
-        get variableTotal() { return 0.35 + 0.08 + 0.04 + 0.09 + 0.085; } // 64.5%
-      },
-      commercial: {
-        name: "業務用",
-        material: 0.35,
-        purchase: 0.08,
-        promo: 0.0,
-        logistics: 0.09,
-        centerFee: 0.0,
-        get variableTotal() { return 0.35 + 0.08 + 0.0 + 0.09 + 0.0; } // 52.0%
-      },
-      coop: {
-        name: "生協・通販",
-        material: 0.35,
-        purchase: 0.08,
-        promo: 0.0,
-        logistics: 0.09,
-        centerFee: 0.0,
-        get variableTotal() { return 0.35 + 0.08 + 0.0 + 0.09 + 0.0; } // 52.0%
-      }
+      existing: { name: "既存事業", variableTotal: 0.645, get marginalTotal() { return 1 - 0.645; } },
+      commercial: { name: "業務用", variableTotal: 0.520, get marginalTotal() { return 1 - 0.520; } },
+      coop: { name: "生協・通販", variableTotal: 0.520, get marginalTotal() { return 1 - 0.520; } }
     };
 
-    // 全社固定費 (新データ版: 億円)
-    const FIXED_COSTS = {
-      mfg: 14.00,         // 製造固定費
-      depreciation: 0.40, // 既存減価償却費
-      hq: 5.00,           // 本社人件費・経費
-      get total() { return 14.00 + 0.40 + 5.00; } // 19.40億円
-    };
+    const FIXED_COSTS = { mfg: 14.00, depreciation: 0.40, hq: 5.00, get total() { return 14.00 + 0.40 + 5.00; } };
 
     function App() {
-      // 状態管理
       const [totalSales, setTotalSales] = useState(BASE_TOTAL_SALES);
       const [ratios, setRatios] = useState({ ...BASE_RATIOS });
 
-      // 合計比率の計算 (表示・警告用)
       const currentTotalRatioPercent = Math.round((ratios.existing + ratios.commercial + ratios.coop) * 100);
       const isRatioValid = currentTotalRatioPercent === 100;
 
-      // スライダー手動変更処理 (連動させず単独で動かす)
       const handleRatioChange = (changedKey, newValuePercent) => {
         const val = Number(newValuePercent) / 100;
         setRatios(prev => ({ ...prev, [changedKey]: val }));
       };
 
-      // リセット
+      const handleSalesInputChange = (e) => {
+        let val = parseFloat(e.target.value);
+        if(isNaN(val)) val = 0;
+        setTotalSales(val);
+      };
+
       const handleReset = () => {
         setTotalSales(BASE_TOTAL_SALES);
         setRatios({ ...BASE_RATIOS });
       };
 
-      // 計算共通関数
       const calculateScenario = (sales, rat) => {
-        // 各チャネル売上
         const chSales = {
           existing: sales * rat.existing,
           commercial: sales * rat.commercial,
           coop: sales * rat.coop,
         };
-
-        // 各チャネル変動費明細
-        const chVarDetail = {
-          existing: {
-            material: chSales.existing * COST_RATES.existing.material,
-            purchase: chSales.existing * COST_RATES.existing.purchase,
-            promo: chSales.existing * COST_RATES.existing.promo,
-            logistics: chSales.existing * COST_RATES.existing.logistics,
-            centerFee: chSales.existing * COST_RATES.existing.centerFee,
-            total: chSales.existing * COST_RATES.existing.variableTotal,
-          },
-          commercial: {
-            material: chSales.commercial * COST_RATES.commercial.material,
-            purchase: chSales.commercial * COST_RATES.commercial.purchase,
-            promo: chSales.commercial * COST_RATES.commercial.promo,
-            logistics: chSales.commercial * COST_RATES.commercial.logistics,
-            centerFee: chSales.commercial * COST_RATES.commercial.centerFee,
-            total: chSales.commercial * COST_RATES.commercial.variableTotal,
-          },
-          coop: {
-            material: chSales.coop * COST_RATES.coop.material,
-            purchase: chSales.coop * COST_RATES.coop.purchase,
-            promo: chSales.coop * COST_RATES.coop.promo,
-            logistics: chSales.coop * COST_RATES.coop.logistics,
-            centerFee: chSales.coop * COST_RATES.coop.centerFee,
-            total: chSales.coop * COST_RATES.coop.variableTotal,
-          }
+        const chMarginal = {
+          existing: chSales.existing * COST_RATES.existing.marginalTotal,
+          commercial: chSales.commercial * COST_RATES.commercial.marginalTotal,
+          coop: chSales.coop * COST_RATES.coop.marginalTotal,
         };
-
-        // 全社変動費合計
-        const plVar = {
-          material: chVarDetail.existing.material + chVarDetail.commercial.material + chVarDetail.coop.material,
-          purchase: chVarDetail.existing.purchase + chVarDetail.commercial.purchase + chVarDetail.coop.purchase,
-          promo: chVarDetail.existing.promo + chVarDetail.commercial.promo + chVarDetail.coop.promo,
-          logistics: chVarDetail.existing.logistics + chVarDetail.commercial.logistics + chVarDetail.coop.logistics,
-          centerFee: chVarDetail.existing.centerFee + chVarDetail.commercial.centerFee + chVarDetail.coop.centerFee,
-          total: chVarDetail.existing.total + chVarDetail.commercial.total + chVarDetail.coop.total,
-        };
-
-        // 配賦後固定費 (※構成比が100%でない場合でも固定費の総額は一定)
-        // 合計が100%でない場合は固定費が余る・足りない状態になるのを防ぐため、
-        // その時点での「3つのチャネルの合計比率」の中での割合で再按分する
-        const currentTotalRatio = rat.existing + rat.commercial + rat.coop;
         
+        const marginalProfit = chMarginal.existing + chMarginal.commercial + chMarginal.coop;
+        
+        const currentTotalRatio = rat.existing + rat.commercial + rat.coop;
         let chFixed = { existing: 0, commercial: 0, coop: 0 };
         if (currentTotalRatio > 0) {
           chFixed = {
@@ -192,48 +85,34 @@
           };
         }
 
-        // ※合計が100%でない場合、計算上の総売上は変動する（スライダーの売上と合わなくなる）
         const calcTotalSales = chSales.existing + chSales.commercial + chSales.coop;
-        
-        // 限界利益 (売上 - 変動費)
-        const marginalProfit = calcTotalSales - plVar.total;
-
-        // 固定費は一定
         const fixedTotal = FIXED_COSTS.total;
-
-        // 全社営業利益
         const operatingProfit = marginalProfit - fixedTotal;
 
         const chOpProfit = {
-          existing: chSales.existing - chVarDetail.existing.total - chFixed.existing,
-          commercial: chSales.commercial - chVarDetail.commercial.total - chFixed.commercial,
-          coop: chSales.coop - chVarDetail.coop.total - chFixed.coop,
+          existing: chMarginal.existing - chFixed.existing,
+          commercial: chMarginal.commercial - chFixed.commercial,
+          coop: chMarginal.coop - chFixed.coop,
         };
 
-        return {
-          sales: calcTotalSales,
-          sliderSales: sales, // スライダー上の全社売上高
-          chSales,
-          chVarDetail,
-          plVar,
-          marginalProfit,
-          fixedTotal,
-          operatingProfit,
-          chFixed,
-          chOpProfit
-        };
+        return { sales: calcTotalSales, sliderSales: sales, chSales, chMarginal, marginalProfit, fixedTotal, operatingProfit, chFixed, chOpProfit };
       };
 
-      // 初期状態と現在シミュレーションの計算
       const baseResult = useMemo(() => calculateScenario(BASE_TOTAL_SALES, BASE_RATIOS), []);
       const currentResult = useMemo(() => calculateScenario(totalSales, ratios), [totalSales, ratios]);
 
-      // 差分計算
       const profitDiff = currentResult.operatingProfit - baseResult.operatingProfit;
       const salesDiff = currentResult.sales - baseResult.sales;
 
-      // フォーマット関数
+      // 要因分析の計算
+      const baseMpRate = baseResult.marginalProfit / baseResult.sales;
+      const currentMpRate = currentResult.sales > 0 ? currentResult.marginalProfit / currentResult.sales : 0;
+      
+      const volumeImpact = salesDiff * baseMpRate;
+      const mixImpact = currentResult.sales * (currentMpRate - baseMpRate);
+
       const fmt = (num) => num.toFixed(1);
+      const fmtInt = (num) => Math.round(num).toString();
       const fmtDiff = (num) => {
         const val = num.toFixed(1);
         if (num > 0.001) return `+${val}`;
@@ -243,504 +122,185 @@
 
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 relative">
-          {/* ヘッダー */}
           <header className="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-8 border-b border-emerald-200 gap-4">
             <div>
               <div className="flex items-center gap-3">
                 <span className="bg-emerald-600 text-white text-xs font-bold px-2.5 py-1 rounded">八王子食品</span>
-                <span className="bg-accent-400 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
-                  ★ ゲーム感覚で学ぶP/L
-                </span>
+                <span className="bg-accent-400 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">★ 利益体質をつくる</span>
               </div>
-              <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 mt-2">
-                チャネル戦略＆固変分解シミュレーター
-              </h1>
-              <p className="text-sm text-slate-600 mt-1">
-                売上構成比（チャネル）を変えると利益はどう動く？「変動費」と「固定費」の秘密を体験しよう！
-              </p>
+              <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 mt-2">チャネル戦略シミュレーター (要因分析版)</h1>
+              <p className="text-sm text-slate-600 mt-1">限界利益率の高い製品シェアを上げると、全体利益がどう良くなるか直感的に理解しよう！</p>
             </div>
-            <button
-              onClick={handleReset}
-              className="self-start md:self-auto px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-2 transition z-10"
-            >
+            <button onClick={handleReset} className="self-start md:self-auto px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-2 transition z-10">
               🔄 初期状態に戻す
             </button>
           </header>
 
-          {/* 100%エラー時の画面全体オーバーレイ (オプション: 完全にブロックするわけではなく警告を目立たせる) */}
           {!isRatioValid && (
             <div className="mb-8 p-4 bg-red-50 border border-red-300 rounded-xl shadow-md flex items-start gap-4 animate-pulse">
               <span className="text-3xl">⚠️</span>
               <div>
-                <h3 className="text-lg font-bold text-red-700">
-                  チャネル構成比の合計が {currentTotalRatioPercent}% になっています！
-                </h3>
-                <p className="text-sm text-red-600 mt-1 font-medium">
-                  構成比がちょうど100%にならないと、正確なP/Lシミュレーションができません。<br/>
-                  スライダーを手動で調整して、合計が必ず100%になるようにしてください。
-                </p>
+                <h3 className="text-lg font-bold text-red-700">チャネル構成比の合計が {currentTotalRatioPercent}% になっています！</h3>
+                <p className="text-sm text-red-600 mt-1 font-medium">手動で数値を調整して、合計が必ず100%になるようにしてください。</p>
               </div>
             </div>
           )}
 
-          {/* メインレイアウト */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            {/* 左側：操作スライダーパネル */}
             <div className="lg:col-span-5 space-y-6">
-              
-              {/* コントロールカード */}
               <div className={`bg-white rounded-2xl shadow-sm border p-6 transition-colors ${!isRatioValid ? 'border-red-400 ring-2 ring-red-100' : 'border-emerald-100'}`}>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <span className={`w-3 h-3 rounded-full ${!isRatioValid ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-                    パラメータ手動変更
-                  </h2>
-                  <span className={`text-xs px-2 py-0.5 rounded font-bold ${!isRatioValid ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
-                    合計: {currentTotalRatioPercent}%
-                  </span>
+                  <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">パラメータ手動変更</h2>
+                  <span className={`text-xs px-2 py-0.5 rounded font-bold ${!isRatioValid ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>合計: {currentTotalRatioPercent}%</span>
                 </div>
 
-                {/* 全社売上高スライダー */}
                 <div className="mb-6 p-4 bg-emerald-50/60 rounded-xl border border-emerald-100">
-                  <div className="flex justify-between items-baseline mb-2">
-                    <label className="text-sm font-bold text-slate-700">全社売上高(目標)</label>
-                    <div className="text-right">
-                      <span className="text-2xl font-black text-emerald-700">{fmt(totalSales)}</span>
-                      <span className="text-sm font-bold text-emerald-700 ml-1">億円</span>
-                    </div>
+                  <div className="flex justify-between items-end mb-2">
+                    <label className="text-sm font-bold text-slate-700">全社売上高 (目標)</label>
                   </div>
-                  <input
-                    type="range"
-                    min="30"
-                    max="90"
-                    step="0.5"
-                    value={totalSales}
-                    onChange={(e) => setTotalSales(Number(e.target.value))}
-                    className="w-full h-2 bg-emerald-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[11px] text-slate-400 mt-1">
-                    <span>30.0億円</span>
-                    <span>基準: 55.0億円</span>
-                    <span>90.0億円</span>
+                  <div className="flex items-center gap-3">
+                    <input type="range" min="30" max="90" step="0.5" value={totalSales} onChange={(e) => setTotalSales(Number(e.target.value))} className="w-full h-2 bg-emerald-200 rounded-lg appearance-none cursor-pointer" />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <input type="number" step="0.1" value={totalSales} onChange={handleSalesInputChange} className="w-20 px-2 py-1 text-base border border-slate-300 rounded text-right font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
+                      <span className="text-sm font-bold text-emerald-700">億円</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* チャネル構成比スライダー */}
-                <div className="space-y-5">
-                  <div className="flex justify-between items-end mb-2">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-end mb-1">
                     <label className="text-sm font-bold text-slate-700">チャネル別 構成比率</label>
-                    <div className="text-right">
-                      <span className={`text-sm font-black ${!isRatioValid ? 'text-red-600' : 'text-emerald-600'}`}>
-                        計 {currentTotalRatioPercent}%
-                      </span>
-                      {!isRatioValid && (
-                        <div className="text-[10px] text-red-500 font-bold leading-tight mt-0.5">100%にしてください</div>
-                      )}
-                    </div>
                   </div>
 
-                  {/* 既存事業 */}
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                    <div className="flex justify-between items-center mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                        <span className="text-sm font-bold text-slate-800">既存事業</span>
-                        <span className="text-[11px] bg-red-100 text-red-700 px-1.5 py-0.2 rounded font-medium">
-                          変動費率: {COST_RATES.existing.variableTotal * 100}%
-                        </span>
+                  {[{ id: 'existing', name: '既存事業', color: 'blue', data: COST_RATES.existing },
+                    { id: 'commercial', name: '業務用', color: 'amber', data: COST_RATES.commercial },
+                    { id: 'coop', name: '生協・通販', color: 'emerald', data: COST_RATES.coop }].map(ch => (
+                    <div key={ch.id} className={`p-3 bg-slate-50 rounded-xl border ${ch.id==='coop'?'border-emerald-200 bg-emerald-50/50':'border-slate-200'}`}>
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2.5 h-2.5 rounded-full bg-${ch.color}-500`}></span>
+                          <span className="text-sm font-bold text-slate-800">{ch.name}</span>
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${ch.data.marginalTotal > 0.4 ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>限界利益率: {(ch.data.marginalTotal * 100).toFixed(1)}%</span>
+                        </div>
                       </div>
-                      <div className="text-right font-bold text-slate-800">
-                        {(ratios.existing * 100).toFixed(0)}%
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={ratios.existing * 100}
-                      onChange={(e) => handleRatioChange('existing', e.target.value)}
-                      className={`w-full h-2 bg-blue-100 rounded-lg appearance-none cursor-pointer ${!isRatioValid ? 'slider-warning' : ''}`}
-                    />
-                  </div>
-
-                  {/* 業務用 */}
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                    <div className="flex justify-between items-center mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                        <span className="text-sm font-bold text-slate-800">業務用</span>
-                        <span className="text-[11px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-medium">
-                          変動費率: {COST_RATES.commercial.variableTotal * 100}%
-                        </span>
-                      </div>
-                      <div className="text-right font-bold text-slate-800">
-                        {(ratios.commercial * 100).toFixed(0)}%
+                      <div className="flex items-center gap-3">
+                        <input type="range" min="0" max="100" step="1" value={ratios[ch.id] * 100} onChange={(e) => handleRatioChange(ch.id, e.target.value)} className={`w-full h-2 bg-${ch.color}-100 rounded-lg appearance-none cursor-pointer ${!isRatioValid ? 'slider-warning' : ''}`} />
+                        <div className="flex items-center gap-1 shrink-0">
+                          <input type="number" step="1" value={Math.round(ratios[ch.id] * 100)} onChange={(e) => handleRatioChange(ch.id, e.target.value)} className="w-16 px-1.5 py-1 text-sm border border-slate-300 rounded text-right font-bold outline-none" />
+                          <span className="text-xs text-slate-500 font-bold">%</span>
+                        </div>
                       </div>
                     </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={ratios.commercial * 100}
-                      onChange={(e) => handleRatioChange('commercial', e.target.value)}
-                      className={`w-full h-2 bg-amber-100 rounded-lg appearance-none cursor-pointer ${!isRatioValid ? 'slider-warning' : ''}`}
-                    />
-                  </div>
-
-                  {/* 生協・通販 */}
-                  <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200">
-                    <div className="flex justify-between items-center mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-                        <span className="text-sm font-bold text-emerald-900">生協・通販</span>
-                        <span className="text-[11px] bg-emerald-200 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
-                          変動費率: {COST_RATES.coop.variableTotal * 100}%
-                        </span>
-                      </div>
-                      <div className="text-right font-bold text-emerald-800">
-                        {(ratios.coop * 100).toFixed(0)}%
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={ratios.coop * 100}
-                      onChange={(e) => handleRatioChange('coop', e.target.value)}
-                      className={`w-full h-2 bg-emerald-200 rounded-lg appearance-none cursor-pointer ${!isRatioValid ? 'slider-warning' : ''}`}
-                    />
-                  </div>
-
+                  ))}
                 </div>
               </div>
 
-              {/* ゲーム風アドバイスカード */}
-              <div className={`p-5 rounded-2xl border transition-all ${
-                !isRatioValid 
-                  ? "bg-slate-100 border-slate-300 opacity-60 grayscale"
-                  : profitDiff > 0.3
-                  ? "bg-gradient-to-r from-emerald-100 to-amber-100 border-emerald-300"
-                  : profitDiff < -0.3
-                  ? "bg-red-50 border-red-200"
-                  : "bg-amber-50 border-amber-200"
-              }`}>
+              <div className={`p-5 rounded-2xl border transition-all ${!isRatioValid ? "bg-slate-100 border-slate-300 opacity-60 grayscale" : mixImpact > 0.3 ? "bg-gradient-to-r from-emerald-100 to-amber-100 border-emerald-300 shadow-md" : mixImpact < -0.3 ? "bg-red-50 border-red-200" : "bg-white border-slate-200"}`}>
                 <div className="flex items-start gap-3">
-                  <div className="text-2xl mt-0.5">
-                    {!isRatioValid ? "🛑" : profitDiff > 1.0 ? "🎉" : profitDiff > 0 ? "💡" : profitDiff < -1.0 ? "⚠️" : "📊"}
-                  </div>
+                  <div className="text-2xl mt-0.5">{!isRatioValid ? "🛑" : mixImpact > 0.3 ? "🌟" : "💡"}</div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">
-                      {!isRatioValid
-                        ? "まずは合計を100%にしましょう"
-                        : profitDiff > 1.0
-                        ? "素晴らしい改善！利益が大幅アップ！"
-                        : profitDiff > 0
-                        ? "利益改善傾向です！"
-                        : profitDiff < -1.0
-                        ? "営業利益が大幅に減少しています"
-                        : "現状維持レベルです"}
+                      {!isRatioValid ? "合計を100%にしてください" : mixImpact > 0.3 ? "高収益体質にシフトしています！" : "利益率(構成比)を意識してみましょう"}
                     </h3>
                     <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                      {!isRatioValid
-                        ? "割合スライダーを手動で動かして、ピッタリ100%に合わせてください。"
-                        : ratios.commercial > 0.3 || ratios.coop > 0.15
-                        ? "【利益率改善】変動費率が低い(52.0%)チャネルの比率が高まったため、限界利益が残りやすくなっています！"
-                        : ratios.existing > 0.8
-                        ? "【既存チャネル偏重】既存事業はセンターフィーや販促費がかさみ変動費率が64.5%と高いため、利益率が圧迫されがちです。"
-                        : "チャネル構成比や売上高を動かして、どうすれば営業利益を最大化できるか実験してみましょう！"}
+                      限界利益率の高い「業務用」や「生協・通販」のシェアを増やすと、全体の売上が同じでも利益が大きく残る（率変化影響額がプラスになる）ことを確認してください！
                     </p>
                   </div>
                 </div>
               </div>
-
             </div>
 
-            {/* 右側：ダッシュボード＆詳細対比表 (100%じゃない時は半透明にしてブロック) */}
-            <div className={`lg:col-span-7 space-y-6 transition-all duration-300 ${!isRatioValid ? 'opacity-30 pointer-events-none blur-[1px]' : ''}`}>
-
-              {/* KPIサマリーハイライト */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className={`lg:col-span-7 space-y-6 transition-all duration-300 ${!isRatioValid ? 'opacity-30 pointer-events-none blur-[2px]' : ''}`}>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="text-xs text-slate-500 font-semibold">全社売上高 (反映後)</div>
-                  <div className="text-xl sm:text-2xl font-black text-slate-800 mt-1">
-                    {fmt(currentResult.sales)}<span className="text-xs font-normal text-slate-500 ml-1">億円</span>
-                  </div>
-                  <div className={`text-xs font-bold mt-1 ${salesDiff >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                    対初期: {fmtDiff(salesDiff)}億円
-                  </div>
+                  <div className="text-xs text-slate-500 font-semibold">全社売上高</div>
+                  <div className="text-2xl font-black text-slate-800 mt-1">{fmt(currentResult.sales)}<span className="text-xs font-normal text-slate-500 ml-1">億円</span></div>
+                  <div className={`text-xs font-bold mt-1 ${salesDiff >= 0 ? "text-emerald-600" : "text-red-500"}`}>対初期: {fmtDiff(salesDiff)}億円</div>
                 </div>
-
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="text-xs text-slate-500 font-semibold">全社限界利益</div>
-                  <div className="text-xl sm:text-2xl font-black text-emerald-700 mt-1">
-                    {fmt(currentResult.marginalProfit)}<span className="text-xs font-normal text-slate-500 ml-1">億円</span>
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">
-                    利益率: {((currentResult.marginalProfit / currentResult.sales) * 100).toFixed(1)}%
-                  </div>
-                </div>
-
-                <div className={`p-4 rounded-xl border shadow-sm col-span-2 sm:col-span-1 ${
-                  currentResult.operatingProfit >= 0
-                    ? "bg-emerald-50/80 border-emerald-300"
-                    : "bg-red-50/80 border-red-300"
-                }`}>
+                <div className={`p-4 rounded-xl border shadow-sm ${currentResult.operatingProfit >= 0 ? "bg-emerald-50/80 border-emerald-300" : "bg-red-50/80 border-red-300"}`}>
                   <div className="text-xs text-slate-600 font-semibold">全社営業利益</div>
-                  <div className={`text-xl sm:text-2xl font-black mt-1 ${
-                    currentResult.operatingProfit >= 0 ? "text-emerald-700" : "text-red-600"
-                  }`}>
-                    {fmt(currentResult.operatingProfit)}<span className="text-xs font-normal text-slate-500 ml-1">億円</span>
-                  </div>
-                  <div className={`text-xs font-extrabold mt-1 ${profitDiff >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                    対初期: {fmtDiff(profitDiff)}億円
-                  </div>
+                  <div className={`text-2xl font-black mt-1 ${currentResult.operatingProfit >= 0 ? "text-emerald-700" : "text-red-600"}`}>{fmt(currentResult.operatingProfit)}<span className="text-xs font-normal text-slate-500 ml-1">億円</span></div>
+                  <div className={`text-xs font-extrabold mt-1 ${profitDiff >= 0 ? "text-emerald-700" : "text-red-600"}`}>対初期: {fmtDiff(profitDiff)}億円</div>
                 </div>
               </div>
 
-              {/* 1. チャネル別 初期状態との比較表 */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex justify-between items-center">
-                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-accent-500 rounded-sm"></span>
-                    チャネル別 業績比較表（売上・変動費・配賦固定費・利益）
-                  </h3>
-                  <span className="text-xs text-slate-500">固定費は構成比で按分</span>
+              {/* 要因分析エリア */}
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4"><span className="w-2 h-2 bg-blue-600 rounded-sm"></span>なぜ利益が増減したのか？（営業利益 増減の要因分析）</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-3.5 rounded-lg border border-slate-100 bg-slate-50">
+                    <div className="text-[11px] font-bold text-slate-600 mb-1">① 売上規模の増減による影響</div>
+                    <div className="text-sm font-bold text-slate-700 mb-2">売上高影響額</div>
+                    <div className={`text-2xl font-black ${volumeImpact >= 0 ? 'text-blue-600' : 'text-red-500'}`}>{fmtDiff(volumeImpact)} <span className="text-xs font-normal text-slate-500">億円</span></div>
+                    <div className="mt-3 text-[10px] text-slate-500 bg-white p-2 rounded border border-slate-100 leading-tight">
+                      <span className="font-semibold text-slate-700">計算式:</span><br/>(現在売上 - 初期売上) × 初期限界利益率<br/>
+                      = ({fmt(currentResult.sales)} - {fmt(baseResult.sales)}) × {fmt(baseMpRate*100)}%
+                    </div>
+                  </div>
+                  <div className={`p-3.5 rounded-lg border ${mixImpact > 0 ? 'border-amber-300 bg-amber-50/50' : mixImpact < 0 ? 'border-red-200 bg-red-50/30' : 'border-slate-100 bg-slate-50'}`}>
+                    <div className="text-[11px] font-bold text-slate-600 mb-1 flex justify-between items-center">② 構成比(利益率)の変化による影響 {mixImpact > 0 && <span className="bg-amber-200 text-amber-800 px-1 py-0.5 rounded text-[9px] font-black">GOOD!</span>}</div>
+                    <div className="text-sm font-bold text-slate-700 mb-2">率変化影響額</div>
+                    <div className={`text-2xl font-black ${mixImpact > 0 ? 'text-amber-600' : mixImpact < 0 ? 'text-red-600' : 'text-slate-600'}`}>{fmtDiff(mixImpact)} <span className="text-xs font-normal text-slate-500">億円</span></div>
+                    <div className="mt-3 text-[10px] text-slate-500 bg-white p-2 rounded border border-slate-100 leading-tight">
+                      <span className="font-semibold text-slate-700">計算式:</span><br/>現在売上 × (現在限界利益率 - 初期限界利益率)<br/>
+                      = {fmt(currentResult.sales)} × ({fmt(currentMpRate*100)}% - {fmt(baseMpRate*100)}%)
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 text-right text-xs font-bold text-slate-700 bg-slate-100 py-1.5 px-3 rounded inline-block float-right">
+                  増減額 合計: ① {fmtDiff(volumeImpact)} ＋ ② {fmtDiff(mixImpact)} ＝ <span className="text-sm">{fmtDiff(profitDiff)} 億円</span>
+                </div>
+                <div className="clear-both"></div>
+              </div>
+
+              {/* チャネル別 比較表 */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-3 bg-slate-50/80 border-b border-slate-200">
+                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">チャネル別 業績比較表</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-slate-100/70 text-slate-600 border-b border-slate-200">
                       <tr>
                         <th className="py-2.5 px-3 font-semibold">チャネル</th>
-                        <th className="py-2.5 px-2 text-right font-semibold">売上高 (構成比)</th>
-                        <th className="py-2.5 px-2 text-right font-semibold">変動費</th>
+                        <th className="py-2.5 px-2 text-right font-semibold">売上高<br/>(構成比)</th>
+                        <th className="py-2.5 px-2 text-right font-semibold">限界利益<br/>(限界利益率)</th>
                         <th className="py-2.5 px-2 text-right font-semibold">配賦固定費</th>
-                        <th className="py-2.5 px-3 text-right font-semibold">営業利益</th>
-                        <th className="py-2.5 px-3 text-right font-semibold bg-emerald-50 text-emerald-900">利益増減</th>
+                        <th className="py-2.5 px-2 text-right font-semibold">営業利益</th>
+                        <th className="py-2.5 px-3 text-right font-semibold bg-emerald-50">利益増減</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {/* 既存事業 */}
-                      <tr className="hover:bg-slate-50/60">
-                        <td className="py-2.5 px-3 font-bold text-slate-700 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                          既存事業
-                        </td>
-                        <td className="py-2.5 px-2 text-right">
-                          <span className="font-bold">{fmt(currentResult.chSales.existing)}</span>億円
-                          <span className="text-[11px] text-slate-400 ml-1">({(ratios.existing * 100).toFixed(0)}%)</span>
-                        </td>
-                        <td className="py-2.5 px-2 text-right text-slate-600">{fmt(currentResult.chVarDetail.existing.total)}億円</td>
-                        <td className="py-2.5 px-2 text-right text-slate-600">{fmt(currentResult.chFixed.existing)}億円</td>
-                        <td className={`py-2.5 px-3 text-right font-bold ${currentResult.chOpProfit.existing >= 0 ? "text-slate-800" : "text-red-500"}`}>
-                          {fmt(currentResult.chOpProfit.existing)}億円
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-bold bg-emerald-50/50">
-                          {fmtDiff(currentResult.chOpProfit.existing - baseResult.chOpProfit.existing)}億円
-                        </td>
-                      </tr>
-
-                      {/* 業務用 */}
-                      <tr className="hover:bg-slate-50/60">
-                        <td className="py-2.5 px-3 font-bold text-slate-700 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                          業務用
-                        </td>
-                        <td className="py-2.5 px-2 text-right">
-                          <span className="font-bold">{fmt(currentResult.chSales.commercial)}</span>億円
-                          <span className="text-[11px] text-slate-400 ml-1">({(ratios.commercial * 100).toFixed(0)}%)</span>
-                        </td>
-                        <td className="py-2.5 px-2 text-right text-slate-600">{fmt(currentResult.chVarDetail.commercial.total)}億円</td>
-                        <td className="py-2.5 px-2 text-right text-slate-600">{fmt(currentResult.chFixed.commercial)}億円</td>
-                        <td className={`py-2.5 px-3 text-right font-bold ${currentResult.chOpProfit.commercial >= 0 ? "text-slate-800" : "text-red-500"}`}>
-                          {fmt(currentResult.chOpProfit.commercial)}億円
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-bold bg-emerald-50/50">
-                          {fmtDiff(currentResult.chOpProfit.commercial - baseResult.chOpProfit.commercial)}億円
-                        </td>
-                      </tr>
-
-                      {/* 生協・通販 */}
-                      <tr className="hover:bg-slate-50/60 bg-emerald-50/20">
-                        <td className="py-2.5 px-3 font-bold text-emerald-900 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                          生協・通販
-                        </td>
-                        <td className="py-2.5 px-2 text-right">
-                          <span className="font-bold text-emerald-800">{fmt(currentResult.chSales.coop)}</span>億円
-                          <span className="text-[11px] text-slate-400 ml-1">({(ratios.coop * 100).toFixed(0)}%)</span>
-                        </td>
-                        <td className="py-2.5 px-2 text-right text-slate-600">{fmt(currentResult.chVarDetail.coop.total)}億円</td>
-                        <td className="py-2.5 px-2 text-right text-slate-600">{fmt(currentResult.chFixed.coop)}億円</td>
-                        <td className={`py-2.5 px-3 text-right font-bold ${currentResult.chOpProfit.coop >= 0 ? "text-emerald-700" : "text-red-500"}`}>
-                          {fmt(currentResult.chOpProfit.coop)}億円
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-extrabold bg-emerald-50 text-emerald-700">
-                          {fmtDiff(currentResult.chOpProfit.coop - baseResult.chOpProfit.coop)}億円
-                        </td>
-                      </tr>
-
-                      {/* 全社合計行 */}
+                      {[{ id: 'existing', name: '既存事業', color: 'blue' }, { id: 'commercial', name: '業務用', color: 'amber' }, { id: 'coop', name: '生協・通販', color: 'emerald' }].map(ch => (
+                        <tr key={ch.id} className="hover:bg-slate-50/60">
+                          <td className="py-2 px-3 font-bold text-slate-700 flex items-center gap-1.5 mt-1.5"><span className={`w-2 h-2 rounded-full bg-${ch.color}-500`}></span>{ch.name}</td>
+                          <td className="py-2 px-2 text-right"><span className="font-bold">{fmtInt(currentResult.chSales[ch.id])}</span><span className="text-[10px] ml-0.5">億円</span><br/><span className="text-[10px] text-slate-400">({fmtInt(ratios[ch.id]*100)}%)</span></td>
+                          <td className="py-2 px-2 text-right text-slate-600">{fmt(currentResult.chMarginal[ch.id])}<span className="text-[10px] ml-0.5">億円</span><br/><span className="text-[10px] text-slate-400">({fmt(COST_RATES[ch.id].marginalTotal*100)}%)</span></td>
+                          <td className="py-2 px-2 text-right text-slate-600">{fmt(currentResult.chFixed[ch.id])}</td>
+                          <td className={`py-2 px-2 text-right font-bold ${currentResult.chOpProfit[ch.id] >= 0 ? "text-slate-800" : "text-red-500"}`}>{fmt(currentResult.chOpProfit[ch.id])}</td>
+                          <td className="py-2 px-3 text-right font-bold bg-emerald-50/50">{fmtDiff(currentResult.chOpProfit[ch.id] - baseResult.chOpProfit[ch.id])}</td>
+                        </tr>
+                      ))}
                       <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
                         <td className="py-2.5 px-3 text-slate-800">全社計</td>
-                        <td className="py-2.5 px-2 text-right">{fmt(currentResult.sales)}億円 ({currentTotalRatioPercent}%)</td>
-                        <td className="py-2.5 px-2 text-right">{fmt(currentResult.plVar.total)}億円</td>
-                        <td className="py-2.5 px-2 text-right">{fmt(currentResult.fixedTotal)}億円</td>
-                        <td className={`py-2.5 px-3 text-right ${currentResult.operatingProfit >= 0 ? "text-emerald-800" : "text-red-600"}`}>
-                          {fmt(currentResult.operatingProfit)}億円
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-emerald-800 bg-emerald-100/70 font-black">
-                          {fmtDiff(profitDiff)}億円
-                        </td>
+                        <td className="py-2.5 px-2 text-right">{fmt(currentResult.sales)}<span className="font-normal text-[10px]">億円</span></td>
+                        <td className="py-2.5 px-2 text-right text-emerald-700">{fmt(currentResult.marginalProfit)}<br/><span className="text-[10px] text-slate-500">({fmt(currentMpRate*100)}%)</span></td>
+                        <td className="py-2.5 px-2 text-right">{fmt(currentResult.fixedTotal)}</td>
+                        <td className={`py-2.5 px-2 text-right ${currentResult.operatingProfit >= 0 ? "text-emerald-800" : "text-red-600"}`}>{fmt(currentResult.operatingProfit)}</td>
+                        <td className="py-2.5 px-3 text-right text-emerald-800 bg-emerald-100/70">{fmtDiff(profitDiff)}</td>
                       </tr>
                     </tbody>
                   </table>
-                </div>
-              </div>
-
-              {/* 2. 損益計算書 (P/L) 比較明細表 */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex justify-between items-center">
-                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-emerald-600 rounded-sm"></span>
-                    全社 損益計算書 (P/L) 比較明細
-                  </h3>
-                  <span className="text-xs text-slate-500">単位: 億円 (小数点第一位)</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-100/70 text-slate-600 border-b border-slate-200">
-                      <tr>
-                        <th className="py-2.5 px-4 font-semibold">勘定科目</th>
-                        <th className="py-2.5 px-3 text-right font-semibold">初期状態 (55.0億円時)</th>
-                        <th className="py-2.5 px-3 text-right font-semibold bg-amber-50/50 text-slate-900">シミュレーション</th>
-                        <th className="py-2.5 px-3 text-right font-semibold bg-emerald-50 text-emerald-900">増減額</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      
-                      {/* 売上高 */}
-                      <tr className="bg-slate-50/40 font-bold">
-                        <td className="py-2.5 px-4 text-slate-900">Ⅰ. 売上高</td>
-                        <td className="py-2.5 px-3 text-right text-slate-600">{fmt(baseResult.sales)}</td>
-                        <td className="py-2.5 px-3 text-right text-slate-900 bg-amber-50/30">{fmt(currentResult.sales)}</td>
-                        <td className="py-2.5 px-3 text-right font-bold text-slate-700 bg-emerald-50/30">{fmtDiff(salesDiff)}</td>
-                      </tr>
-
-                      {/* 変動費タイトル */}
-                      <tr className="bg-red-50/30 font-semibold text-slate-800">
-                        <td className="py-2 px-4 text-red-900">Ⅱ. 変動費 合計</td>
-                        <td className="py-2 px-3 text-right text-slate-600">{fmt(baseResult.plVar.total)}</td>
-                        <td className="py-2 px-3 text-right text-red-700 bg-amber-50/30">{fmt(currentResult.plVar.total)}</td>
-                        <td className="py-2 px-3 text-right text-slate-700 bg-emerald-50/30">{fmtDiff(currentResult.plVar.total - baseResult.plVar.total)}</td>
-                      </tr>
-                      {/* 変動費内訳 */}
-                      <tr className="text-slate-500">
-                        <td className="py-1.5 px-6">・材料費</td>
-                        <td className="py-1.5 px-3 text-right">{fmt(baseResult.plVar.material)}</td>
-                        <td className="py-1.5 px-3 text-right bg-amber-50/20">{fmt(currentResult.plVar.material)}</td>
-                        <td className="py-1.5 px-3 text-right bg-emerald-50/20">{fmtDiff(currentResult.plVar.material - baseResult.plVar.material)}</td>
-                      </tr>
-                      <tr className="text-slate-500">
-                        <td className="py-1.5 px-6">・仕入高</td>
-                        <td className="py-1.5 px-3 text-right">{fmt(baseResult.plVar.purchase)}</td>
-                        <td className="py-1.5 px-3 text-right bg-amber-50/20">{fmt(currentResult.plVar.purchase)}</td>
-                        <td className="py-1.5 px-3 text-right bg-emerald-50/20">{fmtDiff(currentResult.plVar.purchase - baseResult.plVar.purchase)}</td>
-                      </tr>
-                      <tr className="text-slate-500">
-                        <td className="py-1.5 px-6">・販促費 (既存のみ)</td>
-                        <td className="py-1.5 px-3 text-right">{fmt(baseResult.plVar.promo)}</td>
-                        <td className="py-1.5 px-3 text-right bg-amber-50/20">{fmt(currentResult.plVar.promo)}</td>
-                        <td className="py-1.5 px-3 text-right bg-emerald-50/20">{fmtDiff(currentResult.plVar.promo - baseResult.plVar.promo)}</td>
-                      </tr>
-                      <tr className="text-slate-500">
-                        <td className="py-1.5 px-6">・物流費</td>
-                        <td className="py-1.5 px-3 text-right">{fmt(baseResult.plVar.logistics)}</td>
-                        <td className="py-1.5 px-3 text-right bg-amber-50/20">{fmt(currentResult.plVar.logistics)}</td>
-                        <td className="py-1.5 px-3 text-right bg-emerald-50/20">{fmtDiff(currentResult.plVar.logistics - baseResult.plVar.logistics)}</td>
-                      </tr>
-                      <tr className="text-slate-500">
-                        <td className="py-1.5 px-6">・センターフィー (既存のみ)</td>
-                        <td className="py-1.5 px-3 text-right">{fmt(baseResult.plVar.centerFee)}</td>
-                        <td className="py-1.5 px-3 text-right bg-amber-50/20">{fmt(currentResult.plVar.centerFee)}</td>
-                        <td className="py-1.5 px-3 text-right bg-emerald-50/20">{fmtDiff(currentResult.plVar.centerFee - baseResult.plVar.centerFee)}</td>
-                      </tr>
-
-                      {/* 限界利益 */}
-                      <tr className="bg-emerald-50/80 font-bold border-t border-b border-emerald-200">
-                        <td className="py-2.5 px-4 text-emerald-900">Ⅲ. 限界利益 (Ⅰ - Ⅱ)</td>
-                        <td className="py-2.5 px-3 text-right text-slate-700">{fmt(baseResult.marginalProfit)}</td>
-                        <td className="py-2.5 px-3 text-right text-emerald-800 bg-amber-50/30">{fmt(currentResult.marginalProfit)}</td>
-                        <td className="py-2.5 px-3 text-right text-emerald-800 bg-emerald-100/60 font-black">
-                          {fmtDiff(currentResult.marginalProfit - baseResult.marginalProfit)}
-                        </td>
-                      </tr>
-
-                      {/* 固定費タイトル */}
-                      <tr className="bg-blue-50/30 font-semibold text-slate-800">
-                        <td className="py-2 px-4 text-blue-900 flex items-center justify-between">
-                          <span>Ⅳ. 固定費 合計</span>
-                          <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded">
-                            売上に関係なく一定！
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 text-right text-slate-600">{fmt(baseResult.fixedTotal)}</td>
-                        <td className="py-2 px-3 text-right text-blue-900 bg-amber-50/30">{fmt(currentResult.fixedTotal)}</td>
-                        <td className="py-2 px-3 text-right text-slate-400 bg-emerald-50/30">±0.0</td>
-                      </tr>
-                      {/* 固定費内訳 */}
-                      <tr className="text-slate-500">
-                        <td className="py-1.5 px-6">・製造固定費</td>
-                        <td className="py-1.5 px-3 text-right">{fmt(FIXED_COSTS.mfg)}</td>
-                        <td className="py-1.5 px-3 text-right bg-amber-50/20">{fmt(FIXED_COSTS.mfg)}</td>
-                        <td className="py-1.5 px-3 text-right bg-emerald-50/20">±0.0</td>
-                      </tr>
-                      <tr className="text-slate-500">
-                        <td className="py-1.5 px-6">・既存減価償却費</td>
-                        <td className="py-1.5 px-3 text-right">{fmt(FIXED_COSTS.depreciation)}</td>
-                        <td className="py-1.5 px-3 text-right bg-amber-50/20">{fmt(FIXED_COSTS.depreciation)}</td>
-                        <td className="py-1.5 px-3 text-right bg-emerald-50/20">±0.0</td>
-                      </tr>
-                      <tr className="text-slate-500">
-                        <td className="py-1.5 px-6">・本社人件費・経費</td>
-                        <td className="py-1.5 px-3 text-right">{fmt(FIXED_COSTS.hq)}</td>
-                        <td className="py-1.5 px-3 text-right bg-amber-50/20">{fmt(FIXED_COSTS.hq)}</td>
-                        <td className="py-1.5 px-3 text-right bg-emerald-50/20">±0.0</td>
-                      </tr>
-
-                      {/* 営業利益 */}
-                      <tr className={`font-black text-sm border-t-2 ${
-                        currentResult.operatingProfit >= 0 ? "bg-emerald-100/60 text-emerald-950 border-emerald-400" : "bg-red-100 text-red-950 border-red-400"
-                      }`}>
-                        <td className="py-3 px-4">Ⅴ. 営業利益 (Ⅲ - Ⅳ)</td>
-                        <td className="py-3 px-3 text-right text-slate-700">{fmt(baseResult.operatingProfit)}</td>
-                        <td className={`py-3 px-3 text-right bg-amber-50/30 ${
-                          currentResult.operatingProfit >= 0 ? "text-emerald-800" : "text-red-700"
-                        }`}>
-                          {fmt(currentResult.operatingProfit)}
-                        </td>
-                        <td className={`py-3 px-3 text-right bg-emerald-200/60 font-black text-base ${
-                          profitDiff >= 0 ? "text-emerald-900" : "text-red-700"
-                        }`}>
-                          {fmtDiff(profitDiff)}
-                        </td>
-                      </tr>
-
-                    </tbody>
-                  </table>
+                  <div className="p-2 text-[10px] text-slate-500 bg-white">※各チャネルの売上高は整数表示（四捨五入）のため、合計と一致しない場合があります。</div>
                 </div>
               </div>
 
             </div>
-
           </div>
         </div>
       );
     }
-
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
